@@ -1,0 +1,38 @@
+[
+    {
+        "id": "d27082e8-ba89-4cc0-aa5f-04ef901a4aa8",
+        "author": "rohith",
+        "media_path": "dashboard/db/uploads/d27082e8-ba89-4cc0-aa5f-04ef901a4aa8.jpg",
+        "caption": "",
+        "timestamp": "February 24, 2026 at 01:00 AM",
+        "risk_level": "red",
+        "confidence": 0.9664,
+        "sentry_reason": "High-confidence deepfake or synthetic manipulation. Content blocked. Fingerprint registered to ledger.",
+        "fingerprint": "ddd65d57b9450f38512a155e3775817ebe39e94fdec98eb0aae2c135a91e9b96",
+        "action_taken": "block"
+    },
+    {
+        "id": "d9b8d489-98db-4396-ab34-f4857664269d",
+        "author": "rohith",
+        "media_path": "dashboard/db/uploads/d9b8d489-98db-4396-ab34-f4857664269d.jpg",
+        "caption": "",
+        "timestamp": "February 24, 2026 at 01:00 AM",
+        "risk_level": "green",
+        "confidence": 0.0961,
+        "sentry_reason": "No manipulation artifacts detected. Content cleared for publishing.",
+        "fingerprint": "18f62224fbf1c14380d95c6b0a37894fcfda9fcf285b3074e42287bdee034505",
+        "action_taken": "publish"
+    },
+    {
+        "id": "f37ce177-773b-4f28-b135-cada29b5844e",
+        "author": "rohith",
+        "media_path": "dashboard/db/uploads/f37ce177-773b-4f28-b135-cada29b5844e.jpg",
+        "caption": "my gf",
+        "timestamp": "February 24, 2026 at 01:06 AM",
+        "risk_level": "orange",
+        "confidence": 0.6876843571662903,
+        "sentry_reason": "\u26a1 Fast-path: Known threat fingerprint matched in provenance ledger.",
+        "fingerprint": "663dea3b30c3b7e8a2a54f2251bcda4f338d53b0bad102462825d433495cbcc1",
+        "action_taken": "restrict"
+    }
+]
