@@ -288,7 +288,7 @@ def feed_page():
         
         media_path = post["media_path"]
         if os.path.exists(media_path):
-            if media_path.endswith(('.mp4', '.mov', '.webm')):
+            if media_path.lower().endswith(('.mp4', '.mov', '.avi', '.webm', '.mkv')):
                 st.video(media_path)
             else:
                 st.image(media_path, use_column_width=True)
@@ -299,26 +299,30 @@ def feed_page():
 
         # 3. Badges applied by SENTRY-X
         risk = post.get("risk_level", "green")
+        visibility = post.get("visibility_multiplier", 1.0)
+        
         if risk == "yellow":
-            st.markdown("""
+            st.markdown(f'''
             <div class="sentry-badge yellow">
                 <div class="sentry-badge-icon">🤖</div>
                 <div>
                     <b>Recognized as AI-Generated Context</b><br>
                     Independent systems flagged this media as likely generated or heavily modified by AI algorithms.
+                    <br><span style="font-size: 11px; opacity: 0.8; margin-top: 4px; display: block;">Reach Throttled: {visibility*100}%</span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
         elif risk == "orange":
-            st.markdown("""
+            st.markdown(f'''
             <div class="sentry-badge orange">
                 <div class="sentry-badge-icon">⚠️</div>
                 <div>
                     <b>Manipulated Media Warning</b><br>
                     SENTRY-X forensic analysis detected significant digital alteration (Deepfake) in this content. Viewer discretion advised.
+                    <br><span style="font-size: 11px; opacity: 0.8; margin-top: 4px; display: block;">Reach Heavily Suppressed: {visibility*100}% (Removed from feed suggestions)</span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
         
         # 4. Footer (Caption)
         st.markdown(f"""
@@ -368,12 +372,12 @@ def upload_page():
                 status.info("🛡️ SENTRY-X Trust Engine analyzing for deepfakes...")
                 
                 # --- SENTRY-X API CALL ---
-                endpoint = f"{API_BASE}/v1/analyze/video" if is_video else f"{API_BASE}/v1/analyze"
+                endpoint = f"{API_BASE}/v1/analyze/video" if is_video else f"{API_BASE}/v2/analyze"
                 mime_type = f"video/{file_ext}" if is_video else f"image/jpeg"
                 if file_ext == "png": mime_type = "image/png"
                 
                 files = {"file": (uploaded_file.name, io.BytesIO(file_bytes), mime_type)}
-                data = {"platform_id": "vibe-social", "sample_fps": 1.0} if is_video else {"platform_id": "vibe-social"}
+                data = {"platform_id": "vibe-social", "sample_fps": 1.0} if is_video else {"platform_id": "vibe-social", "uploader_id": st.session_state.user, "caption": caption}
                 timeout = 300 if is_video else 60
                 
                 try:
@@ -390,11 +394,36 @@ def upload_page():
                         risk = v_info.get("risk_level", "green")
                         confidence = v_info.get("max_confidence", 0)
                         reason = v_info.get("description", "Authentic")
+                        action_taken = result.get("action", "publish")
+                        fingerprint_sha = result.get("fingerprint", {}).get("sha256", "N/A")
+                        visibility = 1.0
+                        generator = "N/A"
+                        latency = v_info.get("processing_time_ms", 0.0)
                     else:
-                        risk = result.get("risk_level", "green")
-                        confidence = result.get("confidence", 0)
-                        reason = result.get("description", "Authentic")
+                        policy = result.get("amplification_policy", {})
+                        risk = policy.get("tier", "green")
                         
+                        # In fast_path, confidence might not be inside detection_signals
+                        signals = result.get("detection_signals", {})
+                        confidence = signals.get("fusion_threat_score", 1.0 if risk in ["red", "orange"] else 0)
+                        
+                        reason = policy.get("policy_enforcement", "Authentic")
+                        action_taken = policy.get("action", "publish")
+                        fingerprint_sha = result.get("fingerprints", {}).get("sha256", "N/A")
+                        visibility = policy.get("visibility_multiplier", 1.0)
+                        
+                        generator = "Proven Ensemble" if signals else "Known Threat"
+                        
+                        latency_profile = result.get("latency_profile_ms", {})
+                        # fast_path might only have phase1_triage_ms
+                        latency = latency_profile.get("total_pipeline_ms") or latency_profile.get("phase1_triage_ms", 0.0)
+                        
+                        # Let's extract any multilingual matched context language if available
+                        intent_sigs = result.get("intent_classification", {}).get("signals", [])
+                        for sig in intent_sigs:
+                            if "Matched Context Language" in sig:
+                                reason += f" | {sig}"
+                                
                     # Save to JSON database
                     post = {
                         "id": file_id,
@@ -405,8 +434,11 @@ def upload_page():
                         "risk_level": risk,
                         "confidence": confidence,
                         "sentry_reason": reason,
-                        "fingerprint": result.get("fingerprint", {}).get("sha256", "N/A"),
-                        "action_taken": result.get("action", "publish") if not is_video else result.get("verdict", {}).get("action", "publish")
+                        "fingerprint": fingerprint_sha,
+                        "action_taken": action_taken,
+                        "visibility_multiplier": visibility,
+                        "generator": generator,
+                        "latency": latency
                     }
                     
                     posts = get_posts()
@@ -494,7 +526,7 @@ def admin_page():
         with col1:
             media_path = post["media_path"]
             if os.path.exists(media_path):
-                if media_path.endswith(('.mp4', '.mov', '.webm')):
+                if media_path.lower().endswith(('.mp4', '.mov', '.avi', '.webm', '.mkv')):
                     st.video(media_path)
                 else:
                     st.image(media_path)
@@ -507,7 +539,9 @@ def admin_page():
                 <b>Uploader:</b> @{post['author']}<br>
                 <b>Timestamp:</b> {post['timestamp']}<br>
                 <b>Confidence Score:</b> <span style="color:white; font-weight:700;">{post['confidence']*100:.1f}%</span><br>
-                <b>Ledger / SHA-256 Hash:</b> <code style="font-size:11px; background:#0f172a; padding:2px 4px;">{post['fingerprint']}</code><br><br>
+                <b>Ledger / SHA-256 Hash:</b> <code style="font-size:11px; background:#0f172a; padding:2px 4px;">{post['fingerprint']}</code><br>
+                <b>Detection Paradigm:</b> <span style="color:#fbbf24; font-weight:600;">{post.get('generator', 'Unknown')}</span><br>
+                <b>Processing Latency:</b> <span style="color:#94a3b8;">{post.get('latency', 0.0):.2f} ms</span><br><br>
                 <b>SENTRY Engine Audit Log:</b><br>
                 <div style="background:#0f172a; padding:8px 12px; border-radius:6px; border:1px solid #334155; margin-top:4px; font-size:12px; color:#94a3b8;">
                     {post['sentry_reason']}

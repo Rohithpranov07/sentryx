@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from pydantic import BaseModel
 
-from models.detector import detector, classify_risk
+from models.proven_ensemble import get_proven_ensemble
 from video.processor import extract_frames, get_video_metadata, frames_to_jpeg_bytes
 from video.analyzer import FrameResult, aggregate_frame_results, build_timeline_data
 from utils.fingerprint import generate_fingerprints, sha256_file
@@ -228,23 +228,34 @@ async def analyze_video(
 
         # ── Extract and analyze frames ────────────────────────────────────────
         frame_results: List[FrameResult] = []
+        extracted_data = []
 
         for frame_idx, timestamp, pil_image in extract_frames(
             tmp_path,
             sample_fps=sample_fps,
             max_frames=MAX_FRAMES,
         ):
-            confidence, signals = detector.predict(pil_image)
-            risk_info = classify_risk(confidence)
-
+            extracted_data.append((frame_idx, timestamp, pil_image))
+            
+        if not extracted_data:
+            raise HTTPException(status_code=422, detail="Could not extract any frames from video.")
+            
+        t_extract_done = time.time()
+            
+        # ── Frame Inference using Proven Ensemble ──
+        pil_images = [ed[2] for ed in extracted_data]
+        proven_detector = get_proven_ensemble()
+        
+        for (frame_idx, timestamp, _), pil_image in zip(extracted_data, pil_images):
+            result = proven_detector.predict(pil_image)
             frame_results.append(FrameResult(
                 frame_index      = frame_idx,
                 timestamp_s      = timestamp,
-                confidence       = confidence,
-                risk_level       = risk_info["risk_level"],
-                verdict          = risk_info["verdict"],
-                action           = risk_info["action"],
-                forensic_signals = signals,
+                confidence       = result["probability"],
+                risk_level       = result["risk_level"],
+                verdict          = result["verdict"],
+                action           = result["action"],
+                forensic_signals = [f"{k}: {v}" for k, v in result["raw_scores"].items()],
             ))
 
         if not frame_results:
@@ -338,9 +349,9 @@ async def analyze_video(
             sample_fps       = sample_fps,
             max_frames_cap   = MAX_FRAMES,
             device_used      = str(DEVICE),
-            model            = "efficientnet_b4 + frame aggregation",
+            model            = "V4 Proven Ensemble (Frame-by-Frame)",
             poc_note         = (
-                "PoC: Frame-by-frame EfficientNet-B4 analysis with temporal aggregation. "
+                "PoC: Frame-by-frame V4 Proven Ensemble analysis with temporal aggregation. "
                 "Production would add TimeSformer/VideoSwin for native video understanding "
                 "and Wav2Vec2 for audio-visual sync forensics."
             ),

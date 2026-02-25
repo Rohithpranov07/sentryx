@@ -4,3 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+models/hf_cache/
+dashboard/db/uploads/
+logs/
+.DS_Store

@@ -48,10 +48,10 @@ TRANSFORM = T.Compose([
     ),
 ])
 
-# ── Risk thresholds ───────────────────────────────────────────────────────────
+# ── Risk thresholds (Calibrated per USER specifications) ─────────────────────
 RISK_GREEN_MAX  = float(os.getenv("RISK_GREEN_MAX",  "0.30"))
-RISK_YELLOW_MAX = float(os.getenv("RISK_YELLOW_MAX", "0.55"))
-RISK_ORANGE_MAX = float(os.getenv("RISK_ORANGE_MAX", "0.75"))
+RISK_YELLOW_MAX = float(os.getenv("RISK_YELLOW_MAX", "0.50"))
+RISK_ORANGE_MAX = float(os.getenv("RISK_ORANGE_MAX", "0.85")) # Increased from 0.75, no hard block under 0.85
 
 
 class DeepfakeDetector:
@@ -120,12 +120,81 @@ class DeepfakeDetector:
 
         # Forward pass
         logit = self.model(tensor)
+        
+        # 1. Confidence Calibration (Temperature Scaling & Probability Smoothing)
+        temperature = 1.35
+        calibration_shift = -0.5 # Shift towards authentic to reduce false positives
+        logit = (logit + calibration_shift) / temperature
+        
         confidence = torch.sigmoid(logit).item()
+        
+        # 4. Authenticity Boost (Positive signals for real media)
+        confidence, auth_signals = self._apply_authenticity_boost(confidence, image)
 
         # Generate forensic signals based on confidence bands
-        signals = self._generate_signals(confidence, image)
+        signals = auth_signals + self._generate_signals(confidence, image)
 
         return confidence, signals
+
+    def _apply_authenticity_boost(self, base_conf: float, image: Image.Image) -> Tuple[float, list]:
+        """
+        Actively reduce risk scores if there is evidence of natural, organic origins.
+        """
+        signals = []
+        conf = base_conf
+        img_array = np.array(image.convert("RGB"))
+        
+        # Natural sensor noise patterns decrease confidence of synthetic generation
+        gray = np.mean(img_array, axis=2)
+        noise_std = float(np.std(np.diff(gray, axis=1)))
+        if 8.0 <= noise_std <= 25.0:
+            conf *= 0.75  # 25% risk reduction
+            signals.append("Natural camera sensor noise pattern detected (Authenticity Boost)")
+            
+        # Natural color channel balance
+        r_mean = float(np.mean(img_array[:, :, 0]))
+        g_mean = float(np.mean(img_array[:, :, 1]))
+        b_mean = float(np.mean(img_array[:, :, 2]))
+        channel_delta = max(r_mean, g_mean, b_mean) - min(r_mean, g_mean, b_mean)
+        if channel_delta < 15:
+            conf *= 0.85  # 15% risk reduction
+            signals.append("Organic RGB channel correlations maintain natural lighting ratio (Authenticity Boost)")
+            
+        return max(0.0, conf), signals
+
+    @torch.no_grad()
+    def predict_batch(self, images: list[Image.Image], batch_size: int = 16) -> Tuple[list[float], list[list[str]]]:
+        """
+        Run inference on a batch of PIL Images.
+        """
+        if not images:
+            return [], []
+            
+        confidences = []
+        signals_list = []
+        
+        for i in range(0, len(images), batch_size):
+            batch_imgs = images[i:i + batch_size]
+            tensors = torch.stack([TRANSFORM(img.convert("RGB")) for img in batch_imgs]).to(DEVICE)
+            
+            logits = self.model(tensors)
+            
+            temperature = 1.35
+            calibration_shift = -0.5
+            logits = (logits + calibration_shift) / temperature
+            
+            batch_confs = torch.sigmoid(logits).squeeze(-1).tolist()
+            
+            if isinstance(batch_confs, float):
+                batch_confs = [batch_confs]
+                
+            # Process boosts
+            for conf, img in zip(batch_confs, batch_imgs):
+                boosted_conf, auth_sigs = self._apply_authenticity_boost(conf, img)
+                confidences.append(boosted_conf)
+                signals_list.append(auth_sigs + self._generate_signals(boosted_conf, img))
+                
+        return confidences, signals_list
 
     def _generate_signals(self, confidence: float, image: Image.Image) -> list:
         """
@@ -137,14 +206,14 @@ class DeepfakeDetector:
         img_array = np.array(image.convert("RGB"))
 
         # ── Signal 1: Texture anomaly estimate ──
-        # High-frequency noise in real images follows natural statistics.
-        # GAN/diffusion outputs have characteristic frequency signatures.
         gray = np.mean(img_array, axis=2)
         noise_std = float(np.std(np.diff(gray, axis=1)))
-        if noise_std < 8.0:
-            signals.append(f"Low texture noise variance ({noise_std:.1f}) — consistent with synthetic smoothing")
-        elif noise_std > 40.0:
-            signals.append(f"Elevated texture noise ({noise_std:.1f}) — possible JPEG artifact injection")
+        
+        # Make texture triggers extremely conservative (most algorithms are noisy anyway)
+        if noise_std < 2.0:
+            signals.append(f"Impossibly low texture noise variance ({noise_std:.1f}) — consistent with extreme synthetic smoothing")
+        elif noise_std > 80.0:
+            signals.append(f"Elevated texture noise ({noise_std:.1f}) — possible compression/adversarial artifact injection")
 
         # ── Signal 2: Color channel imbalance ──
         # GANs sometimes produce subtle RGB channel correlation artifacts
@@ -168,8 +237,10 @@ class DeepfakeDetector:
 
         # ── Signal 4: Resolution anomaly ──
         w, h = image.size
-        if w != h and (w > 1024 or h > 1024):
-            signals.append(f"Non-standard aspect ratio ({w}x{h}) — may indicate cropped synthetic output")
+        # Exclusively flag perfectly square, non-standard resolutions over 1500px 
+        # (This is a hallmark of upscaled Midjourney/DALL-E, not real smartphone cameras)
+        if w == h and w > 1500:
+            signals.append(f"Perfect 1:1 high-resolution aspect ratio ({w}x{h}) typically output by diffusion models.")
 
         return signals if signals else ["No anomalous signals detected"]
 

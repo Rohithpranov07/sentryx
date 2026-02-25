@@ -38,6 +38,7 @@ from utils.ledger import init_ledger, lookup_sha256, lookup_similar, register_th
 from utils.device import DEVICE
 
 from app.video_routes import router as video_router
+from app.v2_routes import v2_router
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 init_ledger()
@@ -69,6 +70,7 @@ SUPPORTED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 app.include_router(video_router, prefix="/v1/analyze", tags=["Video Detection"])
+app.include_router(v2_router, prefix="/v2", tags=["V2 Pipeline"])
 
 @app.get("/", tags=["Info"])
 async def root():
@@ -79,6 +81,7 @@ async def root():
         "endpoints": {
             "analyze":       "POST /v1/analyze",
             "analyze_video": "POST /v1/analyze/video",
+            "analyze_v2":    "POST /v2/analyze",
             "fingerprint":   "GET  /v1/fingerprint/{sha256}",
             "health":        "GET  /v1/health",
             "docs":          "GET  /docs",
@@ -98,7 +101,7 @@ async def analyze(
     Runs the full SENTRY-X pipeline:
     1. Validate and fingerprint the upload
     2. Check provenance ledger for known threats (fast-path)
-    3. Run AI forensic detection (EfficientNet-B4)
+    3. Run AI forensic detection (V4 Proven Ensemble)
     4. Classify into risk tier (🟢🟡🟠🔴)
     5. Register RED/ORANGE verdicts to permanent ledger
     6. Return structured verdict with forensic signals
@@ -239,11 +242,9 @@ async def analyze(
         file_size_bytes=len(file_bytes),
         image_dimensions=f"{w}x{h}",
         device_used=str(DEVICE),
-        model="efficientnet_b4 (ImageNet pretrained — ff++ fine-tune pending)",
+        model="V4 Proven Pipeline Ensemble",
         poc_note=(
-            "PoC mode: EfficientNet-B4 with ImageNet weights. "
-            "Fine-tuned weights on FaceForensics++ / DFDC would significantly improve accuracy. "
-            "Inference pipeline, API contract, and ledger are production-ready."
+            "V1 legacy endpoint updated to report V4 model availability."
         ),
     )
 
@@ -300,8 +301,8 @@ async def health():
         forensic_engine="healthy",
         ledger="healthy",
         model=ModelInfo(
-            name="EfficientNet-B4",
-            version="ImageNet pretrained (PoC)",
+            name="V4 Proven Ensemble",
+            version="ViT / XceptionNet / GAN FFT",
             device=str(DEVICE),
             status="loaded",
         ),

@@ -1,0 +1,9 @@
+{
+  "label_threshold": 0.5507,
+  "restrict_threshold": 0.5507,
+  "block_threshold": 0.9,
+  "roc_auc": 1.0,
+  "restrict_fpr": 0.0,
+  "restrict_tpr": 1.0,
+  "youden_j": 1.0
+}

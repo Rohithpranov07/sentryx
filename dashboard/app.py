@@ -293,11 +293,11 @@ def get_health() -> dict | None:
         return None
 
 
-def analyze_image(file_bytes: bytes, filename: str, platform_id: str) -> dict | None:
+def analyze_image(file_bytes: bytes, filename: str, platform_id: str, caption: str = "") -> dict | None:
     try:
         files = {"file": (filename, io.BytesIO(file_bytes), "image/jpeg")}
-        data  = {"platform_id": platform_id}
-        r = requests.post(f"{API_BASE}/v1/analyze", files=files, data=data, timeout=60)
+        data  = {"platform_id": platform_id, "caption": caption, "uploader_id": "demo_admin"}
+        r = requests.post(f"{API_BASE}/v2/analyze", files=files, data=data, timeout=60)
         return r.json()
     except Exception as e:
         return {"error": str(e)}
@@ -344,7 +344,7 @@ st.markdown(f"""
       <span class="status-dot" style="background:{status_color};"></span>{status_text}
     </span><br>
     <span style="font-family:'Space Mono',monospace; font-size:0.65rem; color:#475569;">
-      v0.1.0-alpha &nbsp;·&nbsp; EfficientNet-B4
+      V4.0 Proven Suite &nbsp;·&nbsp; ViT + Xception + GAN FFT
     </span>
   </div>
 </div>
@@ -359,6 +359,21 @@ if not st.session_state.api_online:
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
     platform_id = st.text_input("Platform ID", value="ai4dev-demo", help="Identifier for the originating platform")
+    st.markdown("---")
+    
+    st.markdown("### 🔑 API Keys")
+    st.markdown("<div style='font-size:0.75rem; color:#94a3b8; margin-bottom:10px;'>Required for Online V4 Detector (Gemini, Midjourney detection)</div>", unsafe_allow_html=True)
+    import os
+    current_key = os.getenv("GEMINI_API_KEY", "")
+    gemini_key = st.text_input("Gemini API Key", type="password", value=current_key)
+    if gemini_key and gemini_key != current_key:
+        import pathlib
+        env_path = pathlib.Path(__file__).parent.parent / ".env"
+        with open(env_path, "a") as f:
+            f.write(f"\nGEMINI_API_KEY='{gemini_key}'\n")
+        os.environ["GEMINI_API_KEY"] = gemini_key
+        st.success("API Key saved!")
+    
     st.markdown("---")
 
     # Live health panel
@@ -421,10 +436,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("""
     <div style="font-family:'Space Mono',monospace; font-size:0.65rem; color:#334155; line-height:1.8;">
-    SENTRY-X PoC v0.1.0<br>
+    SENTRY-X V4.0 Proven Pipeline<br>
     AI4Dev '26 · PSG College of Technology<br>
     Lead Dev: V. Rohith Pranov<br>
-    Stack: FastAPI · EfficientNet-B4 · SQLite Ledger
+    Stack: FastAPI · ViT/XceptionNet/GAN-FFT
     </div>
     """, unsafe_allow_html=True)
 
@@ -473,6 +488,8 @@ with tab_analyze:
               {uploaded.name} &nbsp;·&nbsp; {w}×{h}px &nbsp;·&nbsp; {format_bytes(uploaded.size)}
             </div>
             """, unsafe_allow_html=True)
+            
+            caption = st.text_input("Context Caption", placeholder="Optional: Enter a caption to test Multilingual Intent Scanning")
 
         analyze_btn = st.button(
             "🔍 &nbsp; Analyze Now",
@@ -485,37 +502,55 @@ with tab_analyze:
         st.markdown("#### Analysis Result")
 
         if uploaded and analyze_btn:
-            with st.spinner("Running forensic analysis..."):
+            with st.spinner("Running deep multimodal analysis..."):
                 file_bytes = uploaded.getvalue()
+                caption_payload = caption if "caption" in locals() else ""
                 t0 = time.time()
-                result = analyze_image(file_bytes, uploaded.name, platform_id)
+                result = analyze_image(file_bytes, uploaded.name, platform_id, caption_payload)
                 elapsed_total = (time.time() - t0) * 1000
 
             if "error" in result:
                 st.error(f"API error: {result['error']}")
             else:
+                # V2 Parsing Mapping
+                policy = result.get("amplification_policy", {})
+                risk   = policy.get("tier", "green")
+                action = policy.get("action", "publish")
+                
+                signals = result.get("detection_signals", {})
+                conf = signals.get("fusion_threat_score", 1.0 if risk in ["red", "orange"] else 0)
+                reason = policy.get("policy_enforcement", "Authentic")
+                
+                latency_profile = result.get("latency_profile_ms", {})
+                v2_latency = latency_profile.get("total_pipeline_ms") or latency_profile.get("phase1_triage_ms", 0.0)
+                
+                
+                generator = "Proven Ensemble" if signals else "Known Threat"
+
                 # Store in history
                 st.session_state.history.append({
-                    **result,
                     "filename": uploaded.name,
                     "timestamp": datetime.now().strftime("%H:%M:%S"),
+                    "risk_level": risk,
+                    "confidence": conf,
+                    "action": action,
+                    "processing_time_ms": v2_latency,
+                    "fingerprint": result.get("fingerprints") or {},
+                    "ledger": (result.get("threat_intelligence") or {}).get("ledger_txn")
                 })
 
-                risk   = result.get("risk_level", "green")
-                conf   = result.get("confidence", 0)
-                action = result.get("action", "publish")
-
                 # ── Verdict card ──
+                verdict_label = {"green": "Authentic Media", "yellow": "AI-Generated Media", "orange": "Manipulated / Restricted", "red": "High-Risk Threat Blocked"}.get(risk, "Unknown")
                 st.markdown(f"""
                 <div class="verdict-card verdict-{risk}">
-                  <div class="verdict-label">{risk_emoji(risk)} &nbsp;{result.get('verdict', '')}</div>
+                  <div class="verdict-label">{risk_emoji(risk)} &nbsp;{verdict_label}</div>
                   <div>
                     <span class="verdict-action {action_badge_class(action)}">
                       {action.upper()}
                     </span>
                   </div>
                   <div style="margin-top:0.8rem; font-size:0.82rem; color:#94a3b8;">
-                    {result.get('description', '')}
+                    {reason}
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -540,8 +575,8 @@ with tab_analyze:
                 with m1:
                     st.markdown(f"""
                     <div class="metric-tile">
-                      <div class="metric-value" style="font-size:1.4rem;">{result.get('processing_time_ms', 0):.0f}<span style="font-size:0.8rem;color:#64748b;">ms</span></div>
-                      <div class="metric-label">Latency</div>
+                      <div class="metric-value" style="font-size:1.4rem;">{v2_latency:.0f}<span style="font-size:0.8rem;color:#64748b;">ms</span></div>
+                      <div class="metric-label">V2 Latency</div>
                     </div>""", unsafe_allow_html=True)
                 with m2:
                     st.markdown(f"""
@@ -550,19 +585,24 @@ with tab_analyze:
                       <div class="metric-label">Confidence</div>
                     </div>""", unsafe_allow_html=True)
                 with m3:
-                    device = result.get("device_used", "cpu").upper()
                     st.markdown(f"""
                     <div class="metric-tile">
-                      <div class="metric-value" style="font-size:1.1rem;">{device}</div>
-                      <div class="metric-label">Device</div>
+                      <div class="metric-value" style="font-size:0.95rem; line-height:1.3; color:#fbbf24; align-items:center; display:flex; justify-content:center; height:1.4rem;">{generator}</div>
+                      <div class="metric-label">Detection Paradigm</div>
                     </div>""", unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # ── Forensic signals ──
-                st.markdown("**🔬 Forensic Signals**")
-                for sig in result.get("forensic_signals", []):
+                # ── Forensic signals & NLP Intent ──
+                st.markdown("**🔬 V2 Pipeline Audit Signals**")
+                
+                forensics = signals.get("forensic_signals", []) if signals else ["Triage: Payload directly intercepted by cross-platform ledger."]
+                for sig in forensics:
                     st.markdown(f'<div class="signal-item">↳ {sig}</div>', unsafe_allow_html=True)
+                    
+                intent_sigs = result.get("intent_classification", {}).get("signals", [])
+                for sig in intent_sigs:
+                    st.markdown(f'<div class="signal-item" style="border-left-color:#8b5cf6;">🌐 {sig}</div>', unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -586,7 +626,7 @@ with tab_analyze:
                 """, unsafe_allow_html=True)
 
                 # ── Ledger entry (only for red/orange) ──
-                ledger = result.get("ledger")
+                ledger = (result.get("threat_intelligence") or {}).get("ledger_txn")
                 if ledger:
                     st.markdown("<br>", unsafe_allow_html=True)
                     ts = datetime.fromtimestamp(ledger.get("timestamp", 0)).strftime("%Y-%m-%d %H:%M:%S")

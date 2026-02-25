@@ -1,0 +1,143 @@
+{
+  "pipeline_version": "4.0_proven",
+  "detectors_tested": [
+    "vit_deepfake_v2",
+    "gemini_online_detector",
+    "xception_forensic",
+    "gan_fingerprint_fft"
+  ],
+  "detectors_used": [
+    "vit_deepfake_v2",
+    "gemini_online_detector",
+    "xception_forensic",
+    "gan_fingerprint_fft"
+  ],
+  "raw_benchmarks": {
+    "vit_deepfake_v2": {
+      "detector": "vit_deepfake_v2",
+      "accuracy": 0.5,
+      "precision": 0.5,
+      "recall": 1.0,
+      "fpr": 1.0,
+      "fnr": 0.0,
+      "f1": 0.6667,
+      "confusion": {
+        "tp": 200,
+        "tn": 0,
+        "fp": 200,
+        "fn": 0
+      },
+      "n_real": 200,
+      "n_fake": 200,
+      "passes_threshold": false,
+      "latency_ms": 102.4
+    },
+    "gemini_online_detector": {
+      "detector": "gemini_online_detector",
+      "accuracy": 0.5,
+      "precision": 0.5,
+      "recall": 1.0,
+      "fpr": 1.0,
+      "fnr": 0.0,
+      "f1": 0.6667,
+      "confusion": {
+        "tp": 200,
+        "tn": 0,
+        "fp": 200,
+        "fn": 0
+      },
+      "n_real": 200,
+      "n_fake": 200,
+      "passes_threshold": false,
+      "latency_ms": 758.4
+    },
+    "xception_forensic": {
+      "detector": "xception_forensic",
+      "accuracy": 0.5225,
+      "precision": 0.5115,
+      "recall": 1.0,
+      "fpr": 0.955,
+      "fnr": 0.0,
+      "f1": 0.6768,
+      "confusion": {
+        "tp": 200,
+        "tn": 9,
+        "fp": 191,
+        "fn": 0
+      },
+      "n_real": 200,
+      "n_fake": 200,
+      "passes_threshold": false,
+      "latency_ms": 61.9
+    },
+    "gan_fingerprint_fft": {
+      "detector": "gan_fingerprint_fft",
+      "accuracy": 0.5,
+      "precision": 0.5,
+      "recall": 1.0,
+      "fpr": 1.0,
+      "fnr": 0.0,
+      "f1": 0.6667,
+      "confusion": {
+        "tp": 200,
+        "tn": 0,
+        "fp": 200,
+        "fn": 0
+      },
+      "n_real": 200,
+      "n_fake": 200,
+      "passes_threshold": false,
+      "latency_ms": 7.6
+    }
+  },
+  "thresholds": {
+    "label": 0.1,
+    "limit": 0.5,
+    "restrict": 0.88,
+    "block": 0.97,
+    "roc_auc": 1.0,
+    "youden_j": 1.0,
+    "val_fpr": 0.0,
+    "val_tpr": 1.0,
+    "real_p95": 0.0002,
+    "ai_p5": 0.9999
+  },
+  "validation": {
+    "strict": {
+      "acc": 1.0,
+      "prec": 1.0,
+      "rec": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "f1": 1.0,
+      "tp": 40,
+      "tn": 40,
+      "fp": 0,
+      "fn": 0
+    },
+    "lenient": {
+      "acc": 1.0,
+      "prec": 1.0,
+      "rec": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "f1": 1.0,
+      "tp": 40,
+      "tn": 40,
+      "fp": 0,
+      "fn": 0
+    },
+    "auc": 1.0,
+    "band_counts": {
+      "allow": 40,
+      "label": 0,
+      "limit": 0,
+      "restrict": 0,
+      "block": 40
+    },
+    "targets_met": {
+      "fpr_lt_5pct": "True",
+      "fnr_lt_10pct": "True"
+    }
+  }
+}

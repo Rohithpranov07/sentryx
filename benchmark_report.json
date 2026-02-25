@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-02-25T20:38:21.718837",
+  "pipeline_version": "2.1",
+  "overall_metrics_lenient": {
+    "accuracy": 0.4821,
+    "precision": 0.4909,
+    "recall": 0.9643,
+    "f1_score": 0.6506,
+    "false_positive_rate": 1.0,
+    "false_negative_rate": 0.0357,
+    "true_positives": 135,
+    "true_negatives": 0,
+    "false_positives": 140,
+    "false_negatives": 5,
+    "total": 280
+  },
+  "overall_metrics_strict": {
+    "accuracy": 0.55,
+    "precision": 0.5515,
+    "recall": 0.5357,
+    "f1_score": 0.5435,
+    "false_positive_rate": 0.4357,
+    "false_negative_rate": 0.4643,
+    "true_positives": 75,
+    "true_negatives": 79,
+    "false_positives": 61,
+    "false_negatives": 65,
+    "total": 280
+  },
+  "latency": {
+    "mean_ms": 300.6,
+    "p95_ms": 1078.0,
+    "p99_ms": 3176.5
+  },
+  "per_test": {
+    "real_fp_rate": 0.35,
+    "ai_detection_rate": 0.95,
+    "compressed_real_fp": 0.56,
+    "compressed_fake_detection": 1.0,
+    "screenshot_real_fp": 0.8,
+    "screenshot_fake_detection": 1.0
+  }
+}

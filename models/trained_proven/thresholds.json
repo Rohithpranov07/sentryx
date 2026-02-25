@@ -1,0 +1,12 @@
+{
+  "label": 0.1,
+  "limit": 0.5,
+  "restrict": 0.88,
+  "block": 0.97,
+  "roc_auc": 1.0,
+  "youden_j": 1.0,
+  "val_fpr": 0.0,
+  "val_tpr": 1.0,
+  "real_p95": 0.0002,
+  "ai_p5": 0.9999
+}
