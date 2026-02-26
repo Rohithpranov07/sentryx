@@ -6,6 +6,12 @@ from PIL import Image
 # Import the new Pipeline Orchestrator
 from app.v2_pipeline import execute_v2_pipeline
 
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
 v2_router = APIRouter()
 
 @v2_router.post("/analyze")

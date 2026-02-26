@@ -64,7 +64,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SUPPORTED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
+SUPPORTED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp", "image/heic", "image/heif"}
+
+# Optional soft-registration of HEIF plugins
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -132,9 +139,11 @@ async def analyze(
 
     # ── 2. Parse image ────────────────────────────────────────────────────────
     try:
+        # If pillow_heif is registered, Image.open works seamlessly.
         image = Image.open(io.BytesIO(file_bytes))
-        image.verify()                          # Detect corrupt files
-        image = Image.open(io.BytesIO(file_bytes))  # Re-open after verify
+        image.verify()
+        image = Image.open(io.BytesIO(file_bytes))
+        image = image.convert("RGB")
         w, h = image.size
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not decode image: {e}")
