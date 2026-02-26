@@ -295,7 +295,13 @@ def get_health() -> dict | None:
 
 def analyze_image(file_bytes: bytes, filename: str, platform_id: str, caption: str = "") -> dict | None:
     try:
-        files = {"file": (filename, io.BytesIO(file_bytes), "image/jpeg")}
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(filename)
+        mime_type = mime_type or "image/jpeg"
+        if filename.lower().endswith(".heic"):
+            mime_type = "image/heic"
+            
+        files = {"file": (filename, io.BytesIO(file_bytes), mime_type)}
         data  = {"platform_id": platform_id, "caption": caption, "uploader_id": "demo_admin"}
         r = requests.post(f"{API_BASE}/v2/analyze", files=files, data=data, timeout=60)
         return r.json()
@@ -464,14 +470,14 @@ with tab_analyze:
         st.markdown("#### Upload Media")
         uploaded = st.file_uploader(
             "Drop an image file",
-            type=["jpg", "jpeg", "png", "webp", "bmp"],
+            type=["jpg", "jpeg", "png", "webp", "bmp", "heic", "heif"],
             label_visibility="collapsed",
         )
 
         if not uploaded:
             st.markdown("""
             <div class="upload-hint">
-              📁 &nbsp;JPEG · PNG · WebP · BMP<br><br>
+              📁 &nbsp;JPEG · PNG · WebP · HEIC<br><br>
               Upload any image to analyze it for<br>
               deepfake manipulation and synthetic generation.<br><br>
               <strong style="color:#1e40af;">Tip for demo:</strong><br>

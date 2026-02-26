@@ -343,7 +343,7 @@ def upload_page():
     st.markdown("<p style='color:#94a3b8;'>Share a photo or video to your followers. SENTRY-X analyzes all uploads in real-time before they reach the feed.</p>", unsafe_allow_html=True)
     
     with st.container(border=True):
-        uploaded_file = st.file_uploader("Select Media", type=["jpg", "jpeg", "png", "mp4", "mov", "avi", "webm"], label_visibility="hidden")
+        uploaded_file = st.file_uploader("Select Media", type=["jpg", "jpeg", "png", "heic", "heif", "mp4", "mov", "avi", "webm"], label_visibility="hidden")
         
         caption = st.text_area("Caption:", placeholder="Write something about this...")
         
@@ -373,8 +373,14 @@ def upload_page():
                 
                 # --- SENTRY-X API CALL ---
                 endpoint = f"{API_BASE}/v1/analyze/video" if is_video else f"{API_BASE}/v2/analyze"
-                mime_type = f"video/{file_ext}" if is_video else f"image/jpeg"
-                if file_ext == "png": mime_type = "image/png"
+                
+                import mimetypes
+                guess_mime, _ = mimetypes.guess_type(uploaded_file.name)
+                if not guess_mime:
+                    guess_mime = f"video/{file_ext}" if is_video else f"image/{file_ext}"
+                if file_ext in ["heic", "heif"]:
+                    guess_mime = f"image/{file_ext}"
+                mime_type = guess_mime
                 
                 files = {"file": (uploaded_file.name, io.BytesIO(file_bytes), mime_type)}
                 data = {"platform_id": "vibe-social", "sample_fps": 1.0} if is_video else {"platform_id": "vibe-social", "uploader_id": st.session_state.user, "caption": caption}
