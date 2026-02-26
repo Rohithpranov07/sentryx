@@ -248,6 +248,7 @@ async def analyze_video(
         
         for (frame_idx, timestamp, _), pil_image in zip(extracted_data, pil_images):
             result = proven_detector.predict(pil_image)
+            raw = result["raw_scores"]
             frame_results.append(FrameResult(
                 frame_index      = frame_idx,
                 timestamp_s      = timestamp,
@@ -255,7 +256,12 @@ async def analyze_video(
                 risk_level       = result["risk_level"],
                 verdict          = result["verdict"],
                 action           = result["action"],
-                forensic_signals = [f"{k}: {v}" for k, v in result["raw_scores"].items()],
+                forensic_signals = [
+                    f"ViT Deepfake P(fake)  = {raw.get('vit_deepfake_v2', 0):.4f}",
+                    f"Gemini 2.5 Online     = {raw.get('gemini_online_detector', 0):.4f}",
+                    f"XceptionNet forensic  = {raw.get('xception_forensic', 0):.4f}",
+                    f"GAN fingerprint (FFT) = {raw.get('gan_fingerprint_fft', 0):.4f}",
+                ],
             ))
 
         if not frame_results:

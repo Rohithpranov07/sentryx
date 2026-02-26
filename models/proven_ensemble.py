@@ -333,15 +333,30 @@ class ProvenEnsemble:
         raw_scores = [d.predict_proba(image) for d in self.detectors]
         X = np.array(raw_scores).reshape(1, -1)
 
-        # Meta-classifier
-        p_fake = float(self.meta.predict_proba(X)[0, 1])
+        vit_s = raw_scores[0]
+        gemini_s = raw_scores[1]
+        xception_s = raw_scores[2]
+        gan_s = raw_scores[3]
 
-        # If we have a Gemini score, heavily weigh it since it's an online detector
-        # and might have been mocked with 0.5 during training if the API key was missing.
-        gemini_score = raw_scores[1]  # online detector is index 1
-        if gemini_score != 0.5:
-            # If Gemini thinks it's strictly AI, bump up probability securely
-            p_fake = max(p_fake, gemini_score)
+        # 1. Base weighted average (heavy weight to spatial models)
+        p_fake = float((vit_s * 0.40) + (xception_s * 0.40) + (gan_s * 0.20))
+
+        # 2. Agreement Rule: If any 2 models suspect AI, boost score to their max
+        suspect_count = sum(1 for s in [vit_s, xception_s, gan_s] if s > 0.60)
+        if suspect_count >= 2:
+            p_fake = max(p_fake, max(vit_s, xception_s, gan_s))
+
+        # 3. Certainty Rule: If any reliable model is extremely sure, follow it
+        if vit_s > 0.88 or xception_s > 0.88:
+            p_fake = max(p_fake, max(vit_s, xception_s))
+        if gan_s > 0.96:
+            p_fake = max(p_fake, 0.78)
+
+        # 4. Gemini Override: As an MLLM, it detects semantic/aesthetic flaws (ChatGPT, Midjourney)
+        if gemini_s > 0.60:
+            p_fake = max(p_fake, gemini_s)
+
+        p_fake = min(1.0, float(p_fake))
 
         # Decision bands (Step 5)
         action, risk, verdict = "allow", "green", "Authentic & Safe"

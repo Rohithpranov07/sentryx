@@ -65,9 +65,10 @@ def phase2_proven_detection(image: Image.Image) -> Dict[str, Any]:
         "thresholds": result.get("thresholds", {}),
         "forensic_signals": [
             f"ViT Deepfake P(fake)  = {raw.get('vit_deepfake_v2', 0):.4f}",
+            f"Gemini 2.5 Online     = {raw.get('gemini_online_detector', 0):.4f}",
             f"XceptionNet forensic  = {raw.get('xception_forensic', 0):.4f}",
             f"GAN fingerprint (FFT) = {raw.get('gan_fingerprint_fft', 0):.4f}",
-            f"Ensemble P(fake)      = {result['probability']:.4f}",
+            f"Ensemble Fusion Score = {result['probability']:.4f}",
             f"Decision band         = {result['action']}",
         ],
         "latency_ms": result.get("latency_ms", 0),
