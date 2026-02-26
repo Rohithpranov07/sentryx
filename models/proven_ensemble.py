@@ -36,9 +36,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 
 from models.proven_detectors import (
-    ViTDeepfakeDetector,
+    CLIPSyntheticDetector,
     OnlineGeminiDetector,
-    XceptionForensicDetector,
+    SigLIPForensicDetector,
     GANFingerprintDetector,
     _compute_metrics,
 )
@@ -333,27 +333,24 @@ class ProvenEnsemble:
         raw_scores = [d.predict_proba(image) for d in self.detectors]
         X = np.array(raw_scores).reshape(1, -1)
 
-        vit_s = raw_scores[0]
+        clip_s = raw_scores[0]
         gemini_s = raw_scores[1]
-        xception_s = raw_scores[2]
+        siglip_s = raw_scores[2]
         gan_s = raw_scores[3]
 
-        # 1. Base weighted average (heavy weight to spatial models)
-        p_fake = float((vit_s * 0.40) + (xception_s * 0.40) + (gan_s * 0.20))
+        # 1. Base semantic verification average
+        p_fake = float((clip_s * 0.40) + (siglip_s * 0.40) + (gan_s * 0.20))
 
-        # 2. Agreement Rule: If any 2 models suspect AI, boost score to their max
-        suspect_count = sum(1 for s in [vit_s, xception_s, gan_s] if s > 0.60)
-        if suspect_count >= 2:
-            p_fake = max(p_fake, max(vit_s, xception_s, gan_s))
-
-        # 3. Certainty Rule: If any reliable model is extremely sure, follow it
-        if vit_s > 0.88 or xception_s > 0.88:
-            p_fake = max(p_fake, max(vit_s, xception_s))
-        if gan_s > 0.96:
-            p_fake = max(p_fake, 0.78)
-
-        # 4. Gemini Override: As an MLLM, it detects semantic/aesthetic flaws (ChatGPT, Midjourney)
-        if gemini_s > 0.60:
+        # 2. Agreement Rule: If multimodal models suspect AI, elevate risk aggressively
+        if clip_s > 0.65 or siglip_s > 0.65:
+            p_fake = max(p_fake, max(clip_s, siglip_s))
+            
+        # 3. High Certainty Rule: If zero-shot CLIP/SigLIP is certain, trust the semantic space
+        if clip_s > 0.90 or siglip_s > 0.90:
+            p_fake = max(p_fake, max(clip_s, siglip_s))
+            
+        # 4. Gemini MLLM Override: Final semantic verification
+        if gemini_s > 0.70:
             p_fake = max(p_fake, gemini_s)
 
         p_fake = min(1.0, float(p_fake))
@@ -485,13 +482,13 @@ def run_proven_pipeline(n_per_variant: int = 40) -> Dict[str, Any]:
 
     # STEP 1: Instantiate proven detectors
     print("\n── STEP 1: Loading Proven Detectors ──")
-    all_detectors = [
-        ViTDeepfakeDetector(),
+    detectors = [
+        CLIPSyntheticDetector(),
         OnlineGeminiDetector(),
-        XceptionForensicDetector(),
+        SigLIPForensicDetector(),
         GANFingerprintDetector(),
     ]
-    for d in all_detectors:
+    for d in detectors:
         if hasattr(d, 'load'):
             d.load()
 
@@ -557,7 +554,7 @@ _proven_ensemble: Optional[ProvenEnsemble] = None
 def get_proven_ensemble() -> ProvenEnsemble:
     global _proven_ensemble
     if _proven_ensemble is None:
-        detectors = [ViTDeepfakeDetector(), OnlineGeminiDetector(), XceptionForensicDetector(), GANFingerprintDetector()]
+        detectors = [CLIPSyntheticDetector(), OnlineGeminiDetector(), SigLIPForensicDetector(), GANFingerprintDetector()]
         _proven_ensemble = ProvenEnsemble(detectors)
         if not _proven_ensemble._load():
             print("[ProvenEnsemble] No saved model. Running training pipeline...")
